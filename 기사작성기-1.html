@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>데스크 — 원문 대조 기사 작성기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Serif+KR:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#14171c;
+    --ink-2:#1d2229;
+    --paper:#f2f1ec;
+    --paper-line:#d8d5cb;
+    --verified:#1f7a6c;
+    --pending:#c98a2c;
+    --fail:#b23b3b;
+    --text-on-ink:#e9e7de;
+    --text-dim:#8b93a0;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'IBM Plex Mono', monospace;
+    background:var(--ink);
+    color:var(--text-on-ink);
+  }
+  .desk{
+    display:grid;
+    grid-template-columns: 380px 1fr;
+    min-height:100vh;
+  }
+  @media (max-width: 880px){
+    .desk{grid-template-columns: 1fr;}
+  }
+  /* LEFT: intake / control column */
+  .intake{
+    background:var(--ink-2);
+    padding:28px 22px 60px;
+    border-right:1px solid #2a303a;
+  }
+  .masthead{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:var(--text-dim);
+    border-bottom:1px solid #2a303a;
+    padding-bottom:14px;
+    margin-bottom:22px;
+    display:flex;
+    justify-content:space-between;
+  }
+  h2.section-label{
+    font-size:11px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--text-dim);
+    margin:26px 0 8px;
+    font-weight:500;
+  }
+  h2.section-label:first-of-type{margin-top:0;}
+  textarea{
+    width:100%;
+    background:#0f1216;
+    border:1px solid #2a303a;
+    color:var(--text-on-ink);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    line-height:1.6;
+    padding:10px;
+    border-radius:2px;
+    resize:vertical;
+  }
+  button{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    letter-spacing:.03em;
+    background:var(--verified);
+    color:#0d1210;
+    border:none;
+    padding:10px 14px;
+    border-radius:2px;
+    cursor:pointer;
+    font-weight:600;
+    width:100%;
+    margin-top:10px;
+    transition:filter .15s;
+  }
+  button:hover{filter:brightness(1.08);}
+  button:disabled{background:#3a4048;color:#7d838c;cursor:not-allowed;}
+  button.secondary{background:transparent;border:1px solid #3a4048;color:var(--text-on-ink);}
+  .topic-card{
+    border:1px solid #2a303a;
+    padding:10px 12px;
+    border-radius:2px;
+    margin-bottom:8px;
+    cursor:pointer;
+    background:#0f1216;
+  }
+  .topic-card.selected{border-color:var(--verified); background:#122420;}
+  .topic-card .t-title{font-size:12.5px; font-weight:600; color:var(--text-on-ink); display:flex; gap:8px; align-items:baseline;}
+  .topic-card .t-desc{font-size:11.5px; color:var(--text-dim); margin-top:4px; line-height:1.5;}
+  .topic-card .t-basis{font-size:10.5px; color:var(--pending); margin-top:4px;}
+  .checkbox{width:11px;height:11px;border:1px solid var(--text-dim);display:inline-block;flex-shrink:0;}
+  .topic-card.selected .checkbox{background:var(--verified); border-color:var(--verified);}
+
+  .log{
+    margin-top:8px;
+    font-size:11.5px;
+    line-height:1.7;
+    color:var(--text-dim);
+    max-height:260px;
+    overflow-y:auto;
+    border-left:2px solid #2a303a;
+    padding-left:10px;
+  }
+  .log .entry{margin-bottom:8px;}
+  .log .entry.ok{color:var(--verified);}
+  .log .entry.warn{color:var(--pending);}
+  .log .entry.err{color:var(--fail);}
+  .scorebar{display:flex; gap:6px; margin-top:3px;}
+  .scorebar .seg{flex:1; height:4px; background:#2a303a; border-radius:2px; overflow:hidden;}
+  .scorebar .seg .fill{height:100%; }
+
+  .source-box{
+    font-size:11.5px;
+    background:#0f1216;
+    border:1px solid #2a303a;
+    padding:10px 12px;
+    border-radius:2px;
+    line-height:1.7;
+  }
+  .source-box .k{color:var(--text-dim);}
+
+  /* RIGHT: paper / preview column */
+  .page{
+    background:var(--paper);
+    color:#1c1c1c;
+    padding:56px 64px;
+    position:relative;
+  }
+  @media (max-width: 880px){ .page{padding:32px 22px;} }
+  .page-empty{
+    color:#8a8778;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13px;
+    margin-top:120px;
+    text-align:center;
+    line-height:1.8;
+  }
+  .status-row{
+    display:flex; justify-content:space-between; align-items:center;
+    border-bottom:1px solid var(--paper-line);
+    padding-bottom:14px; margin-bottom:26px;
+    font-family:'IBM Plex Mono', monospace;
+  }
+  .status-row .date{font-size:11px; letter-spacing:.1em; color:#8a8778; text-transform:uppercase;}
+  .stamp{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:.12em;
+    padding:5px 10px;
+    border:2px solid var(--verified);
+    color:var(--verified);
+    transform:rotate(-3deg);
+    border-radius:3px;
+  }
+  .stamp.pending{border-color:var(--pending); color:var(--pending);}
+  article h1{
+    font-family:'Noto Serif KR', serif;
+    font-size:30px;
+    line-height:1.35;
+    margin:0 0 10px;
+    font-weight:700;
+  }
+  article h3.subtitle{
+    font-family:'Noto Serif KR', serif;
+    font-size:16px;
+    font-weight:600;
+    color:#5a5748;
+    margin:0 0 22px;
+  }
+  article .lead{
+    font-family:'Source Serif 4', serif;
+    font-size:17px;
+    line-height:1.8;
+    font-weight:600;
+    border-left:3px solid var(--verified);
+    padding-left:16px;
+    margin-bottom:28px;
+  }
+  article .sect{margin-bottom:22px;}
+  article .sect h4{
+    font-family:'Noto Serif KR', serif;
+    font-size:16.5px;
+    margin:0 0 8px;
+    padding-bottom:6px;
+    border-bottom:1px solid var(--paper-line);
+  }
+  article .sect p{
+    font-family:'Source Serif 4', serif;
+    font-size:15px;
+    line-height:1.85;
+    margin:0;
+    color:#2b2b2b;
+  }
+  .score-panel{
+    margin-top:34px;
+    padding-top:18px;
+    border-top:1px dashed var(--paper-line);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11.5px;
+  }
+  .score-panel .row{display:flex; align-items:center; gap:10px; margin-bottom:8px;}
+  .score-panel .label{width:80px; color:#5a5748;}
+  .score-panel .bar{flex:1; height:6px; background:#e2ded0; border-radius:3px; overflow:hidden;}
+  .score-panel .bar .fill{height:100%;}
+  .score-panel .num{width:34px; text-align:right; font-weight:600;}
+  .score-panel .reason{font-size:10.8px; color:#7a7666; margin:2px 0 10px 90px;}
+  .sources-used{
+    margin-top:24px; font-size:11px; color:#7a7666;
+    border-top:1px solid var(--paper-line); padding-top:10px;
+  }
+  .hint{font-size:11px; color:var(--text-dim); line-height:1.6; margin-top:4px;}
+</style>
+</head>
+<body>
+<div class="desk">
+  <div class="intake">
+    <div class="masthead"><span>DESK / 검증 편집대</span><span id="clock"></span></div>
+
+    <h2 class="section-label">00 · API 키 입력</h2>
+    <div class="hint">platform.claude.com(Anthropic Console)에서 발급받은 API 키를 입력하세요. 이 키는 저장되지 않고 이 브라우저 탭에서만 사용됩니다.</div>
+    <input type="text" id="apiKey" placeholder="sk-ant-..." style="width:100%; margin-top:8px; background:#0f1216; border:1px solid #2a303a; color:var(--text-on-ink); padding:8px; font-family:'IBM Plex Mono'; font-size:12px; border-radius:2px;">
+
+    <h2 class="section-label">01 · 원본 기사 붙여넣기</h2>
+    <textarea id="articleInput" rows="9" placeholder="분석할 기사 본문을 여기에 붙여넣으세요."></textarea>
+    <button id="btnAnalyze">원문 대조 &amp; 참신성 주제 제안</button>
+
+    <div id="sourceSection" style="display:none;">
+      <h2 class="section-label">02 · 확인된 원문</h2>
+      <div class="source-box" id="sourceBox"></div>
+
+      <h2 class="section-label">03 · 참신성 주제 선택 (중복 가능)</h2>
+      <div id="topicList"></div>
+      <button id="btnGenerate" disabled>선택한 주제로 기사 작성 시작</button>
+    </div>
+
+    <h2 class="section-label">04 · 포맷 기준 샘플 (선택)</h2>
+    <div class="hint">이전에 작성했던 기사를 붙여넣고 저장하면, 다음 작성부터 제목·부제·리드·소제목 구조를 그 포맷에 맞춰 검증합니다. 저장된 샘플은 브라우저에 계속 보관됩니다.</div>
+    <textarea id="formatInput" rows="4" placeholder="이전 기사 전문을 붙여넣기..." style="margin-top:8px;"></textarea>
+    <button class="secondary" id="btnSaveFormat">포맷 샘플로 저장</button>
+    <div id="formatList" class="hint" style="margin-top:8px;"></div>
+
+    <h2 class="section-label">진행 로그</h2>
+    <div class="log" id="log"><div class="entry">대기 중...</div></div>
+  </div>
+
+  <div class="page" id="page">
+    <div class="page-empty">왼쪽에서 기사를 붙여넣고<br>「원문 대조 &amp; 참신성 주제 제안」을 눌러 시작하세요.</div>
+  </div>
+</div>
+
+<script>
+const els = {
+  apiKey: document.getElementById('apiKey'),
+  articleInput: document.getElementById('articleInput'),
+  btnAnalyze: document.getElementById('btnAnalyze'),
+  sourceSection: document.getElementById('sourceSection'),
+  sourceBox: document.getElementById('sourceBox'),
+  topicList: document.getElementById('topicList'),
+  btnGenerate: document.getElementById('btnGenerate'),
+  formatInput: document.getElementById('formatInput'),
+  btnSaveFormat: document.getElementById('btnSaveFormat'),
+  formatList: document.getElementById('formatList'),
+  log: document.getElementById('log'),
+  page: document.getElementById('page'),
+  clock: document.getElementById('clock'),
+};
+
+const DEFAULT_FORMAT_GUIDE = `[A형 - 논문(연구) 기반형: 확인된 원문이 특정 학술논문일 때 사용]
+1. 리드(2문단): 1문단은 비유/개념 설명이나 핵심 수치를 요약한 문장으로 시작. 2문단은 "최근 국제학술지 <저널명>에 게재된 연구에서 [소속기관] [이름] 교수(연구팀)는 ~라고 밝혔다" 형식 + 각주번호(위첨자 숫자).
+2. 소제목①(배경/가이드라인): 이 주제가 왜 중요한지, 기존 진료 가이드라인이나 작용 기전을 설명. 소제목은 핵심 문구 한 줄, 필요시 그 아래 강조 부제 한 줄 추가 가능.
+3. 소제목②(핵심 수치): 소제목 자체에 구체적 %나 배수 수치를 포함. 본문은 연구 방법을 한 문장으로 설명한 뒤, 비교 대상(기존 대비/단독군 대비) 수치를 병렬로 제시.
+4. 소제목③(국내 연결 또는 한계/시사점): 국내 통계(통계청, 건강보험심사평가원, 국민영양통계 등)를 인용해 국내 시사점을 제시하거나, 연구의 한계를 명확히 언급.
+5. (선택) 전문가 코멘트 섹션: "[이름] [직함]의 권고"를 소제목으로 걸고, 직접인용 2~3개("~라고 말했다"/"~라고 설명했다"/"~라고 덧붙였다")로 구성.
+6. 참고문헌: 번호를 매겨 저자, 발행연도, 논문 제목, 저널명(이탤릭/꺾쇠 표기), 권·호 등 정식 서지정보를 정확히 표기.
+
+[B형 - 상식/사례 기반형: 특정 단일 논문보다 일반 건강 상식·최근 이슈에 가까울 때 사용]
+1. 리드: 유명인 또는 실제 사례를 hook으로 제시(직접인용 포함) → 해당 질환의 응급성·심각성을 강조하는 문단 → 질문형 전환 문장으로 이어질 소제목 내용을 예고("~은 어떤 증상으로 나타나며, 예방할 방법은 없을까.").
+2. 소제목①: 정의·분류·전조증상 설명.
+3. 소제목②: 위험요인 및 예방·검사·관리 방법.
+4. 참고문헌: 학회·병원·정부기관 출처(정식 논문 서지정보가 없어도 무방).
+
+[공통 규칙]
+- 소제목은 문장형으로, 가능하면 핵심 수치나 인용구를 포함.
+- 문단은 2~4문장, 지나치게 길지 않게.
+- 인용문은 실제 화자의 직함과 이름을 명시하고 "~라고 말했다/밝혔다/설명했다/강조했다/덧붙였다" 등 다양한 서술어 사용.
+- 참고문헌은 반드시 번호를 매기고 본문 내 각주번호와 일치시킬 것.`;
+
+let state = {
+  sourceInfo: null,
+  topics: [],
+  selectedIds: new Set(),
+  formatSamples: [],
+  finalDraft: null,
+};
+
+function tickClock(){
+  els.clock.textContent = new Date().toLocaleString('ko-KR', {hour:'2-digit', minute:'2-digit'});
+}
+tickClock(); setInterval(tickClock, 30000);
+
+function logLine(msg, cls){
+  const d = document.createElement('div');
+  d.className = 'entry' + (cls ? ' '+cls : '');
+  d.textContent = msg;
+  els.log.appendChild(d);
+  els.log.scrollTop = els.log.scrollHeight;
+}
+function logScores(scores){
+  const d = document.createElement('div');
+  d.className = 'entry';
+  const rows = [['정확성', scores.accuracy.score], ['참신성', scores.novelty.score], ['포맷', scores.format.score]];
+  d.innerHTML = rows.map(r => {
+    const pct = Math.max(0, Math.min(10, r[1]))/10*100;
+    const color = r[1] >= 8 ? 'var(--verified)' : (r[1] >= 5 ? 'var(--pending)' : 'var(--fail)');
+    return `<div style="margin-bottom:4px;">${r[0]} ${r[1]}/10<div class="scorebar"><div class="seg"><div class="fill" style="width:${pct}%; background:${color}"></div></div></div></div>`;
+  }).join('');
+  els.log.appendChild(d);
+  els.log.scrollTop = els.log.scrollHeight;
+}
+
+// ---------- storage (persisted format samples) ----------
+async function loadFormatSamples(){
+  try{
+    const r = await window.storage.get('format_samples', false);
+    state.formatSamples = r ? JSON.parse(r.value) : [];
+  }catch(e){ state.formatSamples = []; }
+  renderFormatList();
+}
+async function saveFormatSamples(){
+  try{
+    await window.storage.set('format_samples', JSON.stringify(state.formatSamples), false);
+  }catch(e){ console.error('저장 실패', e); }
+}
+function renderFormatList(){
+  if(!state.formatSamples.length){
+    els.formatList.textContent = '저장된 포맷 샘플 없음 (기본 표준 포맷 사용)';
+    return;
+  }
+  els.formatList.innerHTML = `저장된 샘플 ${state.formatSamples.length}개 ` +
+    state.formatSamples.map((s,i)=>`<span style="cursor:pointer;color:var(--fail);text-decoration:underline;" data-i="${i}" class="delFmt">[삭제${i+1}]</span>`).join(' ');
+  els.formatList.querySelectorAll('.delFmt').forEach(el=>{
+    el.onclick = async ()=>{
+      state.formatSamples.splice(+el.dataset.i, 1);
+      await saveFormatSamples();
+      renderFormatList();
+    };
+  });
+}
+loadFormatSamples();
+
+els.btnSaveFormat.onclick = async ()=>{
+  const v = els.formatInput.value.trim();
+  if(!v) return;
+  state.formatSamples.push(v);
+  if(state.formatSamples.length > 8) state.formatSamples.shift();
+  await saveFormatSamples();
+  els.formatInput.value = '';
+  renderFormatList();
+};
+
+// ---------- Claude API helper (사용자 API 키로 브라우저 직접 호출) ----------
+async function callClaude(system, userText, useSearch){
+  const apiKey = els.apiKey.value.trim();
+  if(!apiKey){ throw new Error('API 키를 먼저 입력하세요.'); }
+  const body = {
+    model: "claude-sonnet-4-6",
+    max_tokens: 1000,
+    system: system,
+    messages: [{ role: "user", content: userText }],
+  };
+  if(useSearch){
+    body.tools = [{ type: "web_search_20250305", name: "web_search" }];
+  }
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  if(!data.content) throw new Error(data.error?.message || JSON.stringify(data));
+  return data.content.filter(b=>b.type==='text').map(b=>b.text).join('\n');
+}
+function parseJSON(text){
+  let t = text.trim();
+  t = t.replace(/^```json/i,'').replace(/^```/,'').replace(/```$/,'').trim();
+  const start = t.indexOf('{');
+  const end = t.lastIndexOf('}');
+  if(start >= 0 && end > start) t = t.substring(start, end+1);
+  return JSON.parse(t);
+}
+
+// ---------- Step 1: analyze ----------
+els.btnAnalyze.onclick = async ()=>{
+  const text = els.articleInput.value.trim();
+  if(!text){ logLine('기사 본문을 입력하세요.', 'warn'); return; }
+  els.btnAnalyze.disabled = true;
+  logLine('원문(논문/보도자료) 검색 중...');
+  try{
+    const sys = `너는 정확성을 최우선으로 하는 팩트체크 편집자다. 사용자가 제공한 뉴스기사 본문이 어떤 원본 자료(학술논문, 학술지, 보도자료, 공식 가이드라인 등)를 근거로 작성되었는지 웹 검색으로 반드시 찾아내라.
+규칙:
+- 반드시 web_search를 사용해 실제 원문을 찾고, 논문 제목/저자/발행연도/학술지명/URL을 원문에서 직접 확인한 값으로만 기입하라. 추측 금지. 확인 안 되면 confidence를 "low"로 표기하고 note에 그 이유를 적어라.
+- 저자가 여러 명이면 "제1저자 외 N인" 형식으로 적어라.
+- 그 다음, 이 기사에 아직 없는 "참신한 추가 정보" 후보를 정확히 3개 제안하라. 각 후보는 다른 매체 기사와 중복되지 않을 만한 구체적 정보(예: 관련 생활습관 수칙, 다른 공식 가이드라인의 수치 등)여야 하며, 그 근거가 되는 실제 기관/가이드라인/논문명과 연도를 basis에 명시하라 (반드시 검색으로 확인할 것, 추측 금지).
+- 오직 아래 JSON 형식만 출력하라. 다른 설명, 마크다운, 코드블록 금지.
+
+{"source":{"found":true,"title":"","authors":"","year":"","journal":"","url":"","confidence":"high","note":""},"topics":[{"id":1,"title":"","desc":"","basis":""},{"id":2,"title":"","desc":"","basis":""},{"id":3,"title":"","desc":"","basis":""}]}`;
+    const out = await callClaude(sys, `기사 본문:\n${text}`, true);
+    const json = parseJSON(out);
+    state.sourceInfo = json.source;
+    state.topics = json.topics;
+    state.selectedIds = new Set();
+    renderSource();
+    renderTopics();
+    els.sourceSection.style.display = 'block';
+    logLine('원문 확인 및 주제 제안 완료.', 'ok');
+  }catch(e){
+    logLine('분석 실패: ' + e.message, 'err');
+  }finally{
+    els.btnAnalyze.disabled = false;
+  }
+};
+
+function renderSource(){
+  const s = state.sourceInfo;
+  els.sourceBox.innerHTML = `
+    <div><span class="k">제목</span> ${s.title || '(미확인)'}</div>
+    <div><span class="k">저자</span> ${s.authors || '(미확인)'}</div>
+    <div><span class="k">연도</span> ${s.year || '(미확인)'}</div>
+    <div><span class="k">학술지/출처</span> ${s.journal || '(미확인)'}</div>
+    <div><span class="k">URL</span> ${s.url ? `<a href="${s.url}" target="_blank" style="color:var(--verified)">${s.url}</a>` : '(미확인)'}</div>
+    <div><span class="k">신뢰도</span> ${s.confidence || '-'} ${s.note ? ' — '+s.note : ''}</div>
+  `;
+}
+function renderTopics(){
+  els.topicList.innerHTML = '';
+  state.topics.forEach(t=>{
+    const div = document.createElement('div');
+    div.className = 'topic-card';
+    div.innerHTML = `<div class="t-title"><span class="checkbox"></span>${t.title}</div>
+      <div class="t-desc">${t.desc}</div>
+      <div class="t-basis">근거: ${t.basis}</div>`;
+    div.onclick = ()=>{
+      if(state.selectedIds.has(t.id)){ state.selectedIds.delete(t.id); div.classList.remove('selected'); }
+      else { state.selectedIds.add(t.id); div.classList.add('selected'); }
+      els.btnGenerate.disabled = state.selectedIds.size === 0;
+    };
+    els.topicList.appendChild(div);
+  });
+}
+
+// ---------- Step 2/3: generate + evaluate loop ----------
+els.btnGenerate.onclick = async ()=>{
+  els.btnGenerate.disabled = true;
+  const articleText = els.articleInput.value.trim();
+  const chosenTopics = state.topics.filter(t=>state.selectedIds.has(t.id));
+  const formatBlock = state.formatSamples.length
+    ? state.formatSamples.map((s,i)=>`[사용자 저장 샘플${i+1}]\n${s}`).join('\n\n') + `\n\n(참고: 위 사용자 샘플을 최우선으로 따르되, 구조가 불명확한 부분은 아래 기본 가이드로 보완)\n\n${DEFAULT_FORMAT_GUIDE}`
+    : DEFAULT_FORMAT_GUIDE;
+
+  let draft = null, evalResult = null, feedback = '';
+  const maxIter = 5;
+  logLine('기사 초안 작성 시작...');
+
+  for(let iter=1; iter<=maxIter; iter++){
+    try{
+      draft = await writeArticle(articleText, chosenTopics, formatBlock, feedback);
+      logLine(`반복 ${iter}: 초안 생성 완료.`);
+      renderDraft(draft, null, false);
+
+      evalResult = await evaluateArticle(draft, articleText, formatBlock);
+      logScores(evalResult);
+
+      const scores = [evalResult.accuracy.score, evalResult.novelty.score, evalResult.format.score];
+      const allPass = scores.every(s => s >= 8);
+
+      if(allPass){
+        logLine(`반복 ${iter}: 완료 — 세 항목 모두 8점 이상.`, 'ok');
+        renderDraft(draft, evalResult, true);
+        break;
+      } else {
+        const items = [
+          {key:'accuracy', label:'정확성', ...evalResult.accuracy},
+          {key:'novelty', label:'참신성', ...evalResult.novelty},
+          {key:'format', label:'포맷 일치', ...evalResult.format},
+        ].sort((a,b)=>a.score-b.score);
+        const worst = items[0];
+        feedback = `이전 초안에서 "${worst.label}" 항목이 ${worst.score}/10점으로 가장 낮았다. 이유: ${worst.reason}\n이 부분을 최우선으로 수정하되, 다른 두 항목의 완성도는 유지하라.`;
+        logLine(`반복 ${iter}: 계속 — "${worst.label}" 항목(${worst.score}점) 보완 중...`, 'warn');
+        renderDraft(draft, evalResult, false);
+        if(iter === maxIter){
+          logLine('최대 반복(5회) 도달 — 기준 미달 항목이 남아있는 상태로 종료.', 'err');
+        }
+      }
+    }catch(e){
+      logLine('오류: ' + e.message, 'err');
+      break;
+    }
+  }
+
+  // save to history for future format consistency
+  if(draft){
+    try{
+      let hist = [];
+      try{ const r = await window.storage.get('article_history', false); hist = r ? JSON.parse(r.value) : []; }catch(e){}
+      hist.push({title: draft.title, subtitle: draft.subtitle, sections: draft.sections.map(s=>s.heading)});
+      if(hist.length > 10) hist.shift();
+      await window.storage.set('article_history', JSON.stringify(hist), false);
+    }catch(e){ console.error(e); }
+  }
+
+  if(draft){
+    state.finalDraft = draft;
+  }
+
+  els.btnGenerate.disabled = false;
+};
+
+async function writeArticle(articleText, chosenTopics, formatBlock, feedback){
+  const topicsText = chosenTopics.map(t=>`- ${t.title}: ${t.desc} (근거: ${t.basis})`).join('\n');
+  const sys = `너는 한국어 건강/과학 뉴스 편집자다. 아래 확인된 원문 정보와 선택된 참신성 주제를 바탕으로 새 기사를 작성하라.
+
+[확인된 원문]
+제목: ${state.sourceInfo.title}
+저자: ${state.sourceInfo.authors}
+연도: ${state.sourceInfo.year}
+출처: ${state.sourceInfo.journal}
+
+[선택된 참신성 주제 - 반드시 포함, 각 수치·수칙은 web_search로 실제 가이드라인/기관명과 연도를 확인 후 정확히 인용]
+${topicsText}
+
+[포맷 기준 - 아래 구조와 어조를 그대로 따를 것. 확인된 원문이 특정 학술논문이고 신뢰도가 충분히 높으면 A형을, 특정 논문보다 일반적인 건강 상식·이슈에 가까우면 B형을 선택하라. 원문 신뢰도: ${state.sourceInfo.confidence || '미상'}]
+${formatBlock}
+
+${feedback ? '[이전 초안에 대한 수정 지시]\n' + feedback : ''}
+
+규칙:
+- 원문 기사(사용자가 입력한 원본)와 문장이 겹치지 않게 새로 작성하되, 사실관계는 원문 및 확인된 출처와 일치해야 한다.
+- 모든 수치, 기관명, 연도는 검색으로 확인된 것만 사용하고 추측하지 않는다.
+- 오직 아래 JSON 형식만 출력하라. 설명, 코드블록 금지.
+
+{"title":"","subtitle":"","lead":"","sections":[{"heading":"","body":""}],"sourcesUsed":[{"name":"","detail":""}]}`;
+  const out = await callClaude(sys, `원본 기사 참고용:\n${articleText}`, true);
+  return parseJSON(out);
+}
+
+async function evaluateArticle(draft, articleText, formatBlock){
+  const sys = `너는 매우 엄격한 팩트체크 데스크 에디터다. 아래 작성된 기사 초안을 3가지 기준으로 1~10점 채점하라. 8점 미만이 정상이며, 진짜로 흠잡을 데 없을 때만 8점 이상을 줘라.
+
+[채점 기준]
+1) accuracy(정확성): 원문 정보(논문 제목/저자/연도/출처)와 기사 내 서술이 정확히 일치하는지. 확인된 원문 정보: 제목=${state.sourceInfo.title}, 저자=${state.sourceInfo.authors}, 연도=${state.sourceInfo.year}, 출처=${state.sourceInfo.journal}
+2) novelty(참신성): 원본 입력 기사와 겹치지 않는 실질적으로 새로운 정보(생활습관 수칙 등)가 있고 그 정보의 근거가 명확하고 정확한지
+3) format(포맷 일치): 아래 포맷 기준과 제목/부제/리드/소제목 구조 및 어조가 일치하는지
+[포맷 기준]
+${formatBlock}
+
+[원본 입력 기사]
+${articleText}
+
+[평가할 초안]
+${JSON.stringify(draft)}
+
+오직 아래 JSON만 출력하라. 설명, 코드블록 금지.
+{"accuracy":{"score":0,"reason":""},"novelty":{"score":0,"reason":""},"format":{"score":0,"reason":""}}`;
+  const out = await callClaude(sys, '위 기준대로 채점하라.', false);
+  return parseJSON(out);
+}
+
+function renderDraft(draft, evalResult, passed){
+  const scoreHtml = evalResult ? `
+    <div class="score-panel">
+      ${renderScoreRow('정확성', evalResult.accuracy)}
+      ${renderScoreRow('참신성', evalResult.novelty)}
+      ${renderScoreRow('포맷 일치', evalResult.format)}
+    </div>` : '';
+  const sourcesHtml = draft.sourcesUsed && draft.sourcesUsed.length
+    ? `<div class="sources-used">참고 자료: ${draft.sourcesUsed.map(s=>`${s.name} — ${s.detail}`).join(' · ')}</div>`
+    : '';
+  els.page.innerHTML = `
+    <div class="status-row">
+      <span class="date">${new Date().toLocaleDateString('ko-KR')} · 검증 편집대</span>
+      <span class="stamp ${passed?'':'pending'}">${passed ? '게재 승인' : '검토 중'}</span>
+    </div>
+    <article>
+      <h1>${draft.title}</h1>
+      <h3 class="subtitle">${draft.subtitle || ''}</h3>
+      <div class="lead">${draft.lead || ''}</div>
+      ${draft.sections.map(s=>`<div class="sect"><h4>${s.heading}</h4><p>${s.body}</p></div>`).join('')}
+      ${sourcesHtml}
+      ${scoreHtml}
+    </article>
+  `;
+}
+function renderScoreRow(label, obj){
+  const pct = Math.max(0, Math.min(10, obj.score))/10*100;
+  const color = obj.score >= 8 ? '#1f7a6c' : (obj.score >= 5 ? '#c98a2c' : '#b23b3b');
+  return `<div class="row"><span class="label">${label}</span><div class="bar"><div class="fill" style="width:${pct}%;background:${color}"></div></div><span class="num">${obj.score}/10</span></div>
+    <div class="reason">${obj.reason}</div>`;
+}
+</script>
+</body>
+</html>
